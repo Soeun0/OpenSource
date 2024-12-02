@@ -21,13 +21,14 @@ void cmd_rm(char **argv);
 void cmd_mv(char **argv);
 void cmd_cat(char **argv);
 
-int getargs(char *cmd, char **argv);
-void execute_command(char **argv);
+int getargs(char *cmd, char **argv, int *IS_BACKGROUND);
+void execute_command(char **argv, int IS_BACKGROUND);
 
 int main() {
     char buf[256];
     char *argv[50];
     int narg;
+    int IS_BACKGROUND;
 
     while (1) {
         printf("shell> ");
@@ -43,22 +44,29 @@ int main() {
             break;
         }
 
-        narg = getargs(buf, argv);
+        narg = getargs(buf, argv, &IS_BACKGROUND);
         if (narg == 0) continue; // 빈 입력 처리
 
-        execute_command(argv);
+        execute_command(argv, IS_BACKGROUND);
     }
     return 0;
 }
 
-int getargs(char *cmd, char **argv) {
+int IS_BACKGROUND = 0;
+
+int getargs(char *cmd, char **argv, int *IS_BACKGROUND) {
     int narg = 0;
+    *IS_BACKGROUND = 0;
+
     while (*cmd) {
         if (*cmd == ' ' || *cmd == '\t') {
             *cmd++ = '\0';
+        } else if (*cmd == '&') {
+            *cmd++ = '\0';
+            *IS_BACKGROUND = 1;
         } else {
             argv[narg++] = cmd++;
-            while (*cmd != '\0' && *cmd != ' ' && *cmd != '\t') {
+            while (*cmd != '\0' && *cmd != ' ' && *cmd != '\t' && *cmd != '&') {
                 cmd++;
             }
         }
@@ -67,7 +75,7 @@ int getargs(char *cmd, char **argv) {
     return narg;
 }
 
-void execute_command(char **argv) {
+void execute_command(char **argv, int IS_BACKGROUND) {
     if (strcmp(argv[0], "ls") == 0) {
         cmd_ls(argv);
     } else if (strcmp(argv[0], "pwd") == 0) {
@@ -89,7 +97,23 @@ void execute_command(char **argv) {
     } else if (strcmp(argv[0], "cat") == 0) {
         cmd_cat(argv);
     } else {
-        printf("Command not found: %s\n", argv[0]);
+        pid_t pid = fork();
+        if (pid < 0) {
+            perror("fork");
+            return;
+        }
+
+        if (pid == 0) { // 자식 프로세스
+            execvp(argv[0], argv); // 외부 명령 실행
+            perror("execvp");
+            exit(EXIT_FAILURE);
+        } else { // 부모 프로세스
+            if (!IS_BACKGROUND) {
+                waitpid(pid, NULL, 0); // 포그라운드 실행 대기
+            } else {
+                printf("[Background] PID: %d\n", pid); // 백그라운드 실행
+            }
+        }
     }
 }
 

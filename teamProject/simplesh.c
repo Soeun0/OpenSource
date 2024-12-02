@@ -23,12 +23,16 @@ void cmd_cat(char **argv);
 
 int getargs(char *cmd, char **argv, int *IS_BACKGROUND);
 void execute_command(char **argv, int IS_BACKGROUND);
+void handle_signal(int sig);
 
 int main() {
     char buf[256];
     char *argv[50];
     int narg;
     int IS_BACKGROUND;
+
+    signal(SIGINT, handle_signal);
+    signal(SIGQUIT, handle_signal);
 
     while (1) {
         printf("shell> ");
@@ -53,6 +57,11 @@ int main() {
 }
 
 int IS_BACKGROUND = 0;
+
+void handle_signal(int sig) {
+    printf("\nSignal %d received. Ignored.\n", sig);
+    fflush(stdout);
+}
 
 int getargs(char *cmd, char **argv, int *IS_BACKGROUND) {
     int narg = 0;
